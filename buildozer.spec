@@ -1,7 +1,5 @@
 [app]
 
-android.sdk = 35
-android.ndk = 28c
 
 title = Mein Organizer
 package.name = meinorganizer
@@ -20,6 +18,8 @@ requirements = python3,kivy,pyjnius
 orientation = portrait
 fullscreen = 0
 
+android.sdk = 35
+android.ndk = 28c
 android.api = 35
 android.minapi = 23
 android.archs = arm64-v8a
