@@ -43,15 +43,14 @@ jobs:
           pip install buildozer
           pip install "cython==0.29.36"
 
-      - name: Buildozer Cache
-        uses: actions/cache@v4
-        with:
-          path: |
-            .buildozer
-            ~/.buildozer
-          key: buildozer-${{ runner.os }}-${{ hashFiles('buildozer.spec') }}
-          restore-keys: |
-            buildozer-${{ runner.os }}-
+      - name: Alte Buildozer-Daten entfernen
+        run: |
+          rm -rf ~/.buildozer
+          rm -rf .buildozer
+
+      - name: Buildozer Android SDK vorbereiten
+        run: |
+          mkdir -p ~/.buildozer/android/platform
 
       - name: APK bauen
         id: build
@@ -76,14 +75,9 @@ jobs:
           path: bin/*.apk
           if-no-files-found: error
 
-      - name: Build-Fehler anzeigen
+      - name: Fehler melden
         if: steps.build.outcome != 'success'
         run: |
-          echo "======================================"
-          echo "DER APK-BUILD IST FEHLGESCHLAGEN"
-          echo "======================================"
-          echo ""
-          echo "Die vollständige Fehlermeldung befindet sich"
-          echo "im Artifact 'Build-Log'."
-          echo ""
+          echo "APK-BUILD FEHLGESCHLAGEN"
+          echo "Siehe Build-Log im Artifact."
           exit 1
