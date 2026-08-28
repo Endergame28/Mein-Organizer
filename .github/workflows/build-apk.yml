@@ -11,7 +11,6 @@ jobs:
     runs-on: ubuntu-22.04
 
     steps:
-
       - name: Repository auschecken
         uses: actions/checkout@v4
 
@@ -44,61 +43,57 @@ jobs:
           pip install buildozer
           pip install "cython==0.29.36"
 
-      - name: Buildozer Android SDK vorbereiten
+      # GitHub Runner besitzt bereits ein Android SDK.
+      # Wir installieren AIDL VOR Buildozer.
+      - name: Android SDK und AIDL installieren
         run: |
-          buildozer android debug 2>&1 | tee sdk-setup.log || true
+          echo "ANDROID_HOME=$ANDROID_HOME"
 
-      - name: Android Build Tools installieren
-        run: |
-          SDK="$HOME/.buildozer/android/platform/android-sdk"
+          sdkmanager --version
 
-          echo "Android SDK:"
-          echo "$SDK"
+          yes | sdkmanager --licenses || true
 
-          echo "SDK-Inhalt:"
-          find "$SDK" -maxdepth 3 -type d | head -100
-
-          SDKMANAGER=$(find "$SDK" -name sdkmanager -type f | head -1)
-
-          if [ -z "$SDKMANAGER" ]; then
-            echo "FEHLER: sdkmanager wurde nicht gefunden."
-            exit 1
-          fi
-
-          echo "SDK Manager:"
-          echo "$SDKMANAGER"
-
-          chmod +x "$SDKMANAGER"
-
-          "$SDKMANAGER" \
-            --sdk_root="$SDK" \
+          sdkmanager \
             "platform-tools" \
             "platforms;android-35" \
             "build-tools;35.0.0"
 
-          yes | "$SDKMANAGER" \
-            --sdk_root="$SDK" \
-            --licenses || true
+          echo "=== AIDL suchen ==="
 
-          echo "AIDL suchen:"
-          find "$SDK/build-tools" -name aidl -type f -print
+          find "$ANDROID_HOME/build-tools" \
+            -name "aidl" \
+            -type f \
+            -print
 
-      - name: AIDL prüfen
+          echo "=== Build Tools ==="
+
+          ls -la "$ANDROID_HOME/build-tools/35.0.0/"
+
+      # Buildozer soll das bereits vorbereitete SDK verwenden.
+      - name: Android SDK für Buildozer vorbereiten
         run: |
-          SDK="$HOME/.buildozer/android/platform/android-sdk"
+          mkdir -p "$HOME/.buildozer/android/platform"
 
-          AIDL=$(find "$SDK/build-tools" -name aidl -type f | head -1)
+          rm -rf "$HOME/.buildozer/android/platform/android-sdk"
 
-          if [ -z "$AIDL" ]; then
+          ln -s "$ANDROID_HOME" \
+            "$HOME/.buildozer/android/platform/android-sdk"
+
+          echo "Buildozer SDK:"
+          ls -la "$HOME/.buildozer/android/platform/"
+
+      - name: AIDL testen
+        run: |
+          AIDL="$ANDROID_HOME/build-tools/35.0.0/aidl"
+
+          if [ ! -f "$AIDL" ]; then
             echo "FEHLER: AIDL wurde nicht gefunden!"
             exit 1
           fi
 
-          echo "AIDL gefunden:"
-          echo "$AIDL"
-
           chmod +x "$AIDL"
 
+          echo "AIDL erfolgreich gefunden:"
           "$AIDL" --version || true
 
       - name: APK bauen
@@ -127,5 +122,7 @@ jobs:
       - name: Fehler melden
         if: steps.build.outcome != 'success'
         run: |
+          echo "======================================"
           echo "APK-BUILD FEHLGESCHLAGEN"
+          echo "======================================"
           exit 1
