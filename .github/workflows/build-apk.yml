@@ -1,4 +1,4 @@
-name: Build Android APK
+name: Build Mein Organizer APK
 
 on:
   workflow_dispatch:
@@ -8,6 +8,7 @@ on:
 
 jobs:
   build:
+    name: Android APK bauen
     runs-on: ubuntu-22.04
 
     steps:
@@ -20,9 +21,9 @@ jobs:
 
 
       # ==========================================
-      # Python
+      # Python 3.11
       # ==========================================
-      - name: Python einrichten
+      - name: Python 3.11 einrichten
         uses: actions/setup-python@v5
         with:
           python-version: "3.11"
@@ -39,12 +40,11 @@ jobs:
 
 
       # ==========================================
-      # Java überprüfen
+      # Java prüfen
       # ==========================================
-      - name: Java Version überprüfen
+      - name: Java prüfen
         run: |
           echo "JAVA_HOME=$JAVA_HOME"
-          echo "PATH=$PATH"
           java -version
           javac -version
 
@@ -61,6 +61,7 @@ jobs:
             zip \
             unzip \
             wget \
+            curl \
             autoconf \
             libtool \
             pkg-config \
@@ -80,184 +81,35 @@ jobs:
           python -m pip install --upgrade pip
           python -m pip install --upgrade setuptools wheel
 
-          pip install buildozer
+          pip install "buildozer==1.5.0"
           pip install "cython==0.29.36"
 
+          echo ""
+          echo "Buildozer:"
+          buildozer --version
+
+          echo ""
+          echo "Python:"
+          python --version
+
 
       # ==========================================
-      # Android SDK vorbereiten
+      # Buildozer Cache löschen
       # ==========================================
-      - name: Android SDK vorbereiten
+      # Wichtig, damit keine alte/falsche
+      # python-for-android Installation verwendet wird.
+      # ==========================================
+      - name: Buildozer Cache vorbereiten
         run: |
+          rm -rf "$HOME/.buildozer"
 
-          SDK="$HOME/.buildozer/android/platform/android-sdk"
+          mkdir -p "$HOME/.buildozer"
 
-          echo "=========================================="
-          echo "Buildozer Android SDK"
-          echo "=========================================="
-
-          mkdir -p "$SDK/tools/bin"
-          mkdir -p "$SDK/cmdline-tools"
-
-
-          # --------------------------------------
-          # Android Command Line Tools
-          # --------------------------------------
-
-          CMDLINE_VERSION="11076708"
-
-          echo "Lade Android Command Line Tools..."
-
-          wget -q \
-            "https://dl.google.com/android/repository/commandlinetools-linux-${CMDLINE_VERSION}_latest.zip" \
-            -O /tmp/cmdline-tools.zip
-
-
-          # --------------------------------------
-          # Entpacken
-          # --------------------------------------
-
-          unzip -q \
-            /tmp/cmdline-tools.zip \
-            -d "$SDK/cmdline-tools"
-
-
-          # --------------------------------------
-          # Struktur
-          # --------------------------------------
-
-          rm -rf "$SDK/cmdline-tools/latest"
-
-          mv \
-            "$SDK/cmdline-tools/cmdline-tools" \
-            "$SDK/cmdline-tools/latest"
-
-
-          # --------------------------------------
-          # sdkmanager
-          # --------------------------------------
-
-          SDKMANAGER="$SDK/cmdline-tools/latest/bin/sdkmanager"
-
-          echo ""
-          echo "sdkmanager:"
-          echo "$SDKMANAGER"
-
-
-          if [ ! -f "$SDKMANAGER" ]; then
-            echo "FEHLER: sdkmanager nicht gefunden!"
-            exit 1
-          fi
-
-
-          # --------------------------------------
-          # Alten Buildozer-Pfad bereitstellen
-          # --------------------------------------
-
-          ln -sf \
-            "$SDKMANAGER" \
-            "$SDK/tools/bin/sdkmanager"
-
-
-          echo ""
-          echo "Buildozer sdkmanager:"
-          echo "$SDK/tools/bin/sdkmanager"
-
-
-          # --------------------------------------
-          # Java prüfen
-          # --------------------------------------
-
-          echo ""
-          echo "Java für sdkmanager:"
-          java -version
-
-
-          # --------------------------------------
-          # Lizenzen
-          # --------------------------------------
-
-          yes | "$SDKMANAGER" \
-            --sdk_root="$SDK" \
-            --licenses || true
-
-
-          # --------------------------------------
-          # Android SDK Komponenten
-          # --------------------------------------
-
-          "$SDKMANAGER" \
-            --sdk_root="$SDK" \
-            "platform-tools" \
-            "platforms;android-35" \
-            "build-tools;35.0.0"
-
-
-          echo ""
-          echo "=========================================="
-          echo "Android SDK fertig"
-          echo "=========================================="
+          echo "Buildozer Cache wurde zurückgesetzt."
 
 
       # ==========================================
-      # AIDL prüfen
-      # ==========================================
-      - name: AIDL überprüfen
-        run: |
-
-          SDK="$HOME/.buildozer/android/platform/android-sdk"
-
-          echo "=========================================="
-          echo "AIDL überprüfen"
-          echo "=========================================="
-
-
-          AIDL=$(find \
-            "$SDK/build-tools" \
-            -type f \
-            -name aidl \
-            | head -1)
-
-
-          if [ -z "$AIDL" ]; then
-            echo "FEHLER: AIDL wurde nicht gefunden!"
-
-            find \
-              "$SDK/build-tools" \
-              -maxdepth 3 \
-              -type f \
-              | head -200
-
-            exit 1
-          fi
-
-
-          echo ""
-          echo "AIDL gefunden:"
-          echo "$AIDL"
-
-          echo ""
-          echo "AIDL Version:"
-
-          "$AIDL" --version || true
-
-
-      # ==========================================
-      # Buildozer SDK konfigurieren
-      # ==========================================
-      - name: Buildozer SDK konfigurieren
-        run: |
-
-          SDK="$HOME/.buildozer/android/platform/android-sdk"
-
-          echo "Buildozer SDK:"
-          echo "$SDK"
-
-          ls -la "$SDK"
-
-
-      # ==========================================
-      # APK bauen
+      # Android Build
       # ==========================================
       - name: APK bauen
         id: build
@@ -265,22 +117,25 @@ jobs:
         run: |
 
           echo "=========================================="
-          echo "BUILD ANDROID APK"
+          echo " MEIN ORGANIZER APK BUILD"
           echo "=========================================="
-
-          echo ""
-          echo "Java:"
-          java -version
 
           echo ""
           echo "Python:"
           python --version
 
           echo ""
+          echo "Java:"
+          java -version
+
+          echo ""
           echo "Buildozer:"
           buildozer --version
 
           echo ""
+          echo "=========================================="
+          echo " Starte Buildozer"
+          echo "=========================================="
 
           buildozer android debug 2>&1 | tee build.log
 
@@ -288,7 +143,7 @@ jobs:
 
 
       # ==========================================
-      # Build Log
+      # Build Log hochladen
       # ==========================================
       - name: Build-Log hochladen
         if: always()
@@ -314,17 +169,15 @@ jobs:
       # ==========================================
       # Fehler melden
       # ==========================================
-      - name: Fehler melden
+      - name: Build fehlgeschlagen
         if: steps.build.outcome != 'success'
         run: |
-
           echo ""
           echo "=========================================="
-          echo "APK-BUILD FEHLGESCHLAGEN"
+          echo " APK BUILD FEHLGESCHLAGEN"
           echo "=========================================="
-
           echo ""
-          echo "Der Build-Log befindet sich im Artifact:"
-          echo "Build-Log"
-
+          echo "Der vollständige Build-Log wurde als"
+          echo "'Build-Log' Artifact gespeichert."
+          echo ""
           exit 1
