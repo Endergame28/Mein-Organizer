@@ -1,8 +1,12 @@
 [app]
 
+android.sdk = 35
+android.ndk = 28c
+
 title = Mein Organizer
 package.name = meinorganizer
 package.domain = org.meinorganizer
+
 
 source.dir = .
 source.include_exts = py,png,jpg,jpeg,json,kv,atlas,wav,m4a
