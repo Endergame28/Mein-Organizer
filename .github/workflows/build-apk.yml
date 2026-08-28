@@ -29,6 +29,27 @@ jobs:
 
 
       # ==========================================
+      # Java 17
+      # ==========================================
+      - name: Java 17 einrichten
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: "17"
+
+
+      # ==========================================
+      # Java überprüfen
+      # ==========================================
+      - name: Java Version überprüfen
+        run: |
+          echo "JAVA_HOME=$JAVA_HOME"
+          echo "PATH=$PATH"
+          java -version
+          javac -version
+
+
+      # ==========================================
       # Linux-Abhängigkeiten
       # ==========================================
       - name: Linux-Abhängigkeiten installieren
@@ -40,7 +61,6 @@ jobs:
             zip \
             unzip \
             wget \
-            openjdk-17-jdk \
             autoconf \
             libtool \
             pkg-config \
@@ -65,9 +85,9 @@ jobs:
 
 
       # ==========================================
-      # Buildozer Android SDK vorbereiten
+      # Android SDK vorbereiten
       # ==========================================
-      - name: Android SDK für Buildozer vorbereiten
+      - name: Android SDK vorbereiten
         run: |
 
           SDK="$HOME/.buildozer/android/platform/android-sdk"
@@ -77,10 +97,11 @@ jobs:
           echo "=========================================="
 
           mkdir -p "$SDK/tools/bin"
+          mkdir -p "$SDK/cmdline-tools"
 
 
           # --------------------------------------
-          # Moderne Android Command Line Tools
+          # Android Command Line Tools
           # --------------------------------------
 
           CMDLINE_VERSION="11076708"
@@ -96,15 +117,13 @@ jobs:
           # Entpacken
           # --------------------------------------
 
-          mkdir -p "$SDK/cmdline-tools"
-
           unzip -q \
             /tmp/cmdline-tools.zip \
             -d "$SDK/cmdline-tools"
 
 
           # --------------------------------------
-          # Moderne Struktur herstellen
+          # Struktur
           # --------------------------------------
 
           rm -rf "$SDK/cmdline-tools/latest"
@@ -120,6 +139,7 @@ jobs:
 
           SDKMANAGER="$SDK/cmdline-tools/latest/bin/sdkmanager"
 
+          echo ""
           echo "sdkmanager:"
           echo "$SDKMANAGER"
 
@@ -131,12 +151,7 @@ jobs:
 
 
           # --------------------------------------
-          # Buildozer erwartet alten Pfad:
-          #
-          # tools/bin/sdkmanager
-          #
-          # Deshalb erstellen wir dort einen
-          # Symlink auf das moderne sdkmanager.
+          # Alten Buildozer-Pfad bereitstellen
           # --------------------------------------
 
           ln -sf \
@@ -149,14 +164,17 @@ jobs:
           echo "$SDK/tools/bin/sdkmanager"
 
 
-          if [ ! -f "$SDK/tools/bin/sdkmanager" ]; then
-            echo "FEHLER: Buildozer sdkmanager fehlt!"
-            exit 1
-          fi
+          # --------------------------------------
+          # Java prüfen
+          # --------------------------------------
+
+          echo ""
+          echo "Java für sdkmanager:"
+          java -version
 
 
           # --------------------------------------
-          # SDK-Lizenzen
+          # Lizenzen
           # --------------------------------------
 
           yes | "$SDKMANAGER" \
@@ -165,7 +183,7 @@ jobs:
 
 
           # --------------------------------------
-          # Android Komponenten
+          # Android SDK Komponenten
           # --------------------------------------
 
           "$SDKMANAGER" \
@@ -180,10 +198,6 @@ jobs:
           echo "Android SDK fertig"
           echo "=========================================="
 
-          echo ""
-          echo "Build Tools:"
-          ls -la "$SDK/build-tools"
-
 
       # ==========================================
       # AIDL prüfen
@@ -197,6 +211,7 @@ jobs:
           echo "AIDL überprüfen"
           echo "=========================================="
 
+
           AIDL=$(find \
             "$SDK/build-tools" \
             -type f \
@@ -205,9 +220,7 @@ jobs:
 
 
           if [ -z "$AIDL" ]; then
-            echo ""
             echo "FEHLER: AIDL wurde nicht gefunden!"
-            echo ""
 
             find \
               "$SDK/build-tools" \
@@ -230,7 +243,21 @@ jobs:
 
 
       # ==========================================
-      # Buildozer APK
+      # Buildozer SDK konfigurieren
+      # ==========================================
+      - name: Buildozer SDK konfigurieren
+        run: |
+
+          SDK="$HOME/.buildozer/android/platform/android-sdk"
+
+          echo "Buildozer SDK:"
+          echo "$SDK"
+
+          ls -la "$SDK"
+
+
+      # ==========================================
+      # APK bauen
       # ==========================================
       - name: APK bauen
         id: build
@@ -240,6 +267,20 @@ jobs:
           echo "=========================================="
           echo "BUILD ANDROID APK"
           echo "=========================================="
+
+          echo ""
+          echo "Java:"
+          java -version
+
+          echo ""
+          echo "Python:"
+          python --version
+
+          echo ""
+          echo "Buildozer:"
+          buildozer --version
+
+          echo ""
 
           buildozer android debug 2>&1 | tee build.log
 
@@ -259,7 +300,7 @@ jobs:
 
 
       # ==========================================
-      # APK
+      # APK hochladen
       # ==========================================
       - name: APK hochladen
         if: steps.build.outcome == 'success'
@@ -271,7 +312,7 @@ jobs:
 
 
       # ==========================================
-      # Fehler
+      # Fehler melden
       # ==========================================
       - name: Fehler melden
         if: steps.build.outcome != 'success'
@@ -283,7 +324,7 @@ jobs:
           echo "=========================================="
 
           echo ""
-          echo "Der vollständige Build-Log befindet sich"
-          echo "im Artifact 'Build-Log'."
+          echo "Der Build-Log befindet sich im Artifact:"
+          echo "Build-Log"
 
           exit 1
