@@ -9,6 +9,8 @@ source.include_exts = py,png,jpg,jpeg,json,kv,atlas,wav,m4a
 
 version = 1.0.0
 
+icon.filename = %(source.dir)s/icon.png
+
 requirements = python3,kivy,pyjnius
 
 orientation = portrait
