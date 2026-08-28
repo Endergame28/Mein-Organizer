@@ -1,128 +1,39 @@
-name: Build Android APK
-
-on:
-  workflow_dispatch:
-  push:
-    branches:
-      - main
-
-jobs:
-  build:
-    runs-on: ubuntu-22.04
-
-    steps:
-      - name: Repository auschecken
-        uses: actions/checkout@v4
-
-      - name: Python einrichten
-        uses: actions/setup-python@v5
-        with:
-          python-version: "3.11"
-
-      - name: Linux-Abhängigkeiten installieren
-        run: |
-          sudo apt-get update
-          sudo apt-get install -y \
-            git \
-            zip \
-            unzip \
-            openjdk-17-jdk \
-            autoconf \
-            libtool \
-            pkg-config \
-            zlib1g-dev \
-            libncurses5-dev \
-            libncursesw5-dev \
-            cmake \
-            libffi-dev \
-            libssl-dev
-
-      - name: Buildozer installieren
-        run: |
-          python -m pip install --upgrade pip setuptools wheel
-          pip install buildozer
-          pip install "cython==0.29.36"
-
-      # GitHub Runner besitzt bereits ein Android SDK.
-      # Wir installieren AIDL VOR Buildozer.
       - name: Android SDK und AIDL installieren
         run: |
-          echo "ANDROID_HOME=$ANDROID_HOME"
+          SDK="$ANDROID_HOME"
 
-          sdkmanager --version
+          echo "Android SDK: $SDK"
 
-          yes | sdkmanager --licenses || true
+          echo "Suche sdkmanager..."
 
-          sdkmanager \
+          SDKMANAGER=$(find "$SDK" -type f -name sdkmanager | head -1)
+
+          if [ -z "$SDKMANAGER" ]; then
+            echo "FEHLER: sdkmanager wurde nicht gefunden!"
+            find "$SDK" -maxdepth 4 -type f | head -100
+            exit 1
+          fi
+
+          echo "sdkmanager gefunden:"
+          echo "$SDKMANAGER"
+
+          chmod +x "$SDKMANAGER"
+
+          echo "Installiere Android Build Tools..."
+
+          yes | "$SDKMANAGER" \
+            --sdk_root="$SDK" \
+            --licenses || true
+
+          "$SDKMANAGER" \
+            --sdk_root="$SDK" \
             "platform-tools" \
             "platforms;android-35" \
             "build-tools;35.0.0"
 
           echo "=== AIDL suchen ==="
 
-          find "$ANDROID_HOME/build-tools" \
+          find "$SDK/build-tools" \
             -name "aidl" \
             -type f \
             -print
-
-          echo "=== Build Tools ==="
-
-          ls -la "$ANDROID_HOME/build-tools/35.0.0/"
-
-      # Buildozer soll das bereits vorbereitete SDK verwenden.
-      - name: Android SDK für Buildozer vorbereiten
-        run: |
-          mkdir -p "$HOME/.buildozer/android/platform"
-
-          rm -rf "$HOME/.buildozer/android/platform/android-sdk"
-
-          ln -s "$ANDROID_HOME" \
-            "$HOME/.buildozer/android/platform/android-sdk"
-
-          echo "Buildozer SDK:"
-          ls -la "$HOME/.buildozer/android/platform/"
-
-      - name: AIDL testen
-        run: |
-          AIDL="$ANDROID_HOME/build-tools/35.0.0/aidl"
-
-          if [ ! -f "$AIDL" ]; then
-            echo "FEHLER: AIDL wurde nicht gefunden!"
-            exit 1
-          fi
-
-          chmod +x "$AIDL"
-
-          echo "AIDL erfolgreich gefunden:"
-          "$AIDL" --version || true
-
-      - name: APK bauen
-        id: build
-        continue-on-error: true
-        run: |
-          buildozer android debug 2>&1 | tee build.log
-          exit ${PIPESTATUS[0]}
-
-      - name: Build-Log hochladen
-        if: always()
-        uses: actions/upload-artifact@v4
-        with:
-          name: Build-Log
-          path: build.log
-          if-no-files-found: warn
-
-      - name: APK hochladen
-        if: steps.build.outcome == 'success'
-        uses: actions/upload-artifact@v4
-        with:
-          name: Mein-Organizer-APK
-          path: bin/*.apk
-          if-no-files-found: error
-
-      - name: Fehler melden
-        if: steps.build.outcome != 'success'
-        run: |
-          echo "======================================"
-          echo "APK-BUILD FEHLGESCHLAGEN"
-          echo "======================================"
-          exit 1
