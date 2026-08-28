@@ -11,17 +11,30 @@ jobs:
     runs-on: ubuntu-22.04
 
     steps:
+
+      # ─────────────────────────────────────
+      # Repository
+      # ─────────────────────────────────────
       - name: Repository auschecken
         uses: actions/checkout@v4
 
+
+      # ─────────────────────────────────────
+      # Python
+      # ─────────────────────────────────────
       - name: Python einrichten
         uses: actions/setup-python@v5
         with:
           python-version: "3.11"
 
+
+      # ─────────────────────────────────────
+      # Linux-Abhängigkeiten
+      # ─────────────────────────────────────
       - name: Linux-Abhängigkeiten installieren
         run: |
           sudo apt-get update
+
           sudo apt-get install -y \
             git \
             zip \
@@ -37,33 +50,50 @@ jobs:
             libffi-dev \
             libssl-dev
 
+
+      # ─────────────────────────────────────
+      # Buildozer
+      # ─────────────────────────────────────
       - name: Buildozer installieren
         run: |
-          python -m pip install --upgrade pip setuptools wheel
+          python -m pip install --upgrade pip
+          python -m pip install --upgrade setuptools wheel
+
           pip install buildozer
           pip install "cython==0.29.36"
 
+
+      # ─────────────────────────────────────
+      # Android SDK
+      # ─────────────────────────────────────
       - name: Android SDK vorbereiten
         run: |
           SDK="$ANDROID_HOME"
 
-          echo "Android SDK:"
+          echo "======================================"
+          echo "Android SDK"
+          echo "======================================"
           echo "$SDK"
+          echo ""
 
           echo "Suche sdkmanager..."
 
-          SDKMANAGER=$(find "$SDK" -type f -name sdkmanager | head -1)
+          SDKMANAGER=$(find "$SDK" \
+            -type f \
+            -name sdkmanager \
+            | head -1)
 
           if [ -z "$SDKMANAGER" ]; then
             echo "FEHLER: sdkmanager wurde nicht gefunden!"
-            find "$SDK" -maxdepth 5 -type f | head -100
+            echo ""
+            echo "SDK-Inhalt:"
+            find "$SDK" -maxdepth 5 -type f | head -200
             exit 1
           fi
 
           echo "sdkmanager gefunden:"
           echo "$SDKMANAGER"
-
-          chmod +x "$SDKMANAGER"
+          echo ""
 
           echo "Installiere Android SDK Komponenten..."
 
@@ -77,49 +107,82 @@ jobs:
             "platforms;android-35" \
             "build-tools;35.0.0"
 
+          echo ""
           echo "Android SDK erfolgreich vorbereitet."
 
+
+      # ─────────────────────────────────────
+      # AIDL prüfen
+      # ─────────────────────────────────────
       - name: AIDL überprüfen
         run: |
           SDK="$ANDROID_HOME"
 
-          echo "Suche AIDL..."
+          echo "======================================"
+          echo "AIDL Suche"
+          echo "======================================"
 
-          AIDL=$(find "$SDK/build-tools" -name aidl -type f | head -1)
+          AIDL=$(find "$SDK/build-tools" \
+            -name aidl \
+            -type f \
+            | head -1)
 
           if [ -z "$AIDL" ]; then
             echo "FEHLER: AIDL wurde nicht gefunden!"
+            echo ""
             echo "Vorhandene Build Tools:"
-            find "$SDK/build-tools" -maxdepth 2 -type f | head -100
+            find "$SDK/build-tools" \
+              -maxdepth 3 \
+              -type f \
+              | head -200
             exit 1
           fi
 
           echo "AIDL gefunden:"
           echo "$AIDL"
+          echo ""
 
-          chmod +x "$AIDL"
-
+          echo "AIDL Version:"
           "$AIDL" --version || true
 
+
+      # ─────────────────────────────────────
+      # Buildozer SDK konfigurieren
+      # ─────────────────────────────────────
       - name: Buildozer SDK konfigurieren
         run: |
           mkdir -p "$HOME/.buildozer/android/platform"
 
-          rm -rf "$HOME/.buildozer/android/platform/android-sdk"
-
-          ln -s "$ANDROID_HOME" \
+          rm -rf \
             "$HOME/.buildozer/android/platform/android-sdk"
 
-          echo "Buildozer verwendet:"
+          ln -s \
+            "$ANDROID_HOME" \
+            "$HOME/.buildozer/android/platform/android-sdk"
+
+          echo "Buildozer Android SDK:"
           ls -la "$HOME/.buildozer/android/platform/"
 
+
+      # ─────────────────────────────────────
+      # APK bauen
+      # ─────────────────────────────────────
       - name: APK bauen
         id: build
         continue-on-error: true
         run: |
+          echo "======================================"
+          echo "BUILD ANDROID APK"
+          echo "======================================"
+
           buildozer android debug 2>&1 | tee build.log
+
           exit ${PIPESTATUS[0]}
 
+
+      # ─────────────────────────────────────
+      # Build-Log speichern
+      # ─────────────────────────────────────
       - name: Build-Log hochladen
         if: always()
         uses: actions/upload-artifact@v4
@@ -128,6 +191,10 @@ jobs:
           path: build.log
           if-no-files-found: warn
 
+
+      # ─────────────────────────────────────
+      # APK speichern
+      # ─────────────────────────────────────
       - name: APK hochladen
         if: steps.build.outcome == 'success'
         uses: actions/upload-artifact@v4
@@ -136,11 +203,19 @@ jobs:
           path: bin/*.apk
           if-no-files-found: error
 
+
+      # ─────────────────────────────────────
+      # Fehler anzeigen
+      # ─────────────────────────────────────
       - name: Fehler melden
         if: steps.build.outcome != 'success'
         run: |
+          echo ""
           echo "======================================"
-          echo "APK-BUILD FEHLGESCHLAGEN"
+          echo " APK-BUILD FEHLGESCHLAGEN"
           echo "======================================"
-          echo "Siehe das Artifact 'Build-Log'."
+          echo ""
+          echo "Der vollständige Build-Log wurde"
+          echo "als Artifact 'Build-Log' gespeichert."
+          echo ""
           exit 1
